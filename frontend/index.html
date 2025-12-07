@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gemini-style Chat — Demo</title>
+
+  <!-- Google font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0f1724;
+      --panel:#0b1220;
+      --muted:#9aa4b2;
+      --accent1:#7c5cff;
+      --accent2:#5eead4;
+      --glass: rgba(255,255,255,0.04);
+      --danger:#ff6b6b;
+      --success:#2ed573;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+    html,body{height:100%;margin:0;background:
+      radial-gradient(1200px 600px at 10% 10%, rgba(124,92,255,0.08), transparent 6%),
+      radial-gradient(1000px 500px at 90% 90%, rgba(94,234,212,0.04), transparent 6%),
+      var(--bg); color:#d3dde6;}
+    a{color:inherit}
+    .app {
+      max-width:1100px;
+      margin:28px auto;
+      display:grid;
+      grid-template-columns:320px 1fr 320px;
+      gap:20px;
+      padding:20px;
+    }
+
+    /* sidebar */
+    .card {
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03);
+      border-radius:14px;
+      padding:16px;
+      box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+    }
+    .logo {
+      display:flex;gap:12px;align-items:center;margin-bottom:14px;
+    }
+    .logo .blob {
+      width:44px;height:44px;border-radius:10px;
+      background:linear-gradient(135deg,var(--accent1),var(--accent2));
+      box-shadow:0 6px 20px rgba(92,64,255,0.14);
+      display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;
+    }
+    .muted{color:var(--muted);font-size:13px}
+
+    nav button{
+      width:100%;
+      display:flex;justify-content:space-between;align-items:center;
+      padding:10px 12px;border-radius:10px;border:0;background:transparent;color:inherit;
+      cursor:pointer;font-weight:600;margin-bottom:8px;
+    }
+    nav button.active{background:linear-gradient(90deg, rgba(124,92,255,0.12), rgba(94,234,212,0.03));}
+
+    /* center panel — chat */
+    .panel {
+      display:flex;flex-direction:column;height:80vh;
+      border-radius:14px;overflow:hidden;
+    }
+    .panel .header {
+      display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.02);
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    }
+    .panel .messages {
+      flex:1; padding:20px; overflow:auto; background:
+      linear-gradient(180deg, rgba(255,255,255,0.003), transparent);
+    }
+    .input-area {
+      padding:12px;border-top:1px solid rgba(255,255,255,0.02);display:flex;gap:8px;background:var(--panel);
+    }
+    textarea{flex:1;border-radius:10px;padding:12px;background:var(--glass);border:1px solid rgba(255,255,255,0.02);color:inherit;resize:none;height:56px}
+    .btn {
+      padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700;
+      background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#051223;
+    }
+    .message {padding:12px 14px;border-radius:12px;margin-bottom:10px;max-width:78%;}
+    .msg-user{background:linear-gradient(90deg, rgba(124,92,255,0.14), rgba(94,234,212,0.04));align-self:flex-end;}
+    .msg-bot{background:rgba(255,255,255,0.02);align-self:flex-start;color:var(--muted);}
+    .small{font-size:12px;color:var(--muted);}
+
+    /* right panel — account & prompts */
+    .prompt-item{padding:10px;border-radius:10px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.02);background:rgba(255,255,255,0.01)}
+    .prompt-item pre{white-space:pre-wrap;margin:0;font-family:inherit;font-size:13px}
+
+    /* forms */
+    form {display:flex;flex-direction:column;gap:8px}
+    input,select{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+    .danger{background:linear-gradient(90deg, rgba(255,107,107,0.12), rgba(255,107,107,0.02));border-color:rgba(255,107,107,0.08)}
+    .success-dot{width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block;margin-right:8px}
+
+    /* tiny */
+    .flex{display:flex;gap:8px;align-items:center}
+    .right {margin-left:auto}
+    .center {text-align:center}
+    .hidden{display:none}
+    footer{color:var(--muted);font-size:13px;margin-top:12px;text-align:center}
+    .error{color:var(--danger);font-weight:700}
+    .ok{color:var(--success);font-weight:700}
+    @media (max-width:1000px){
+      .app{grid-template-columns:1fr; padding:12px}
+      .app > :not(:first-child){margin-top:16px}
+      .panel{height:70vh}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: navigation -->
+    <div class="card" id="left">
+      <div class="logo">
+        <div class="blob">G</div>
+        <div>
+          <div style="font-weight:800">Gemini-style Chat</div>
+          <div class="muted">AI frontend demo</div>
+        </div>
+      </div>
+
+      <div id="nav">
+        <nav>
+          <button id="nav-chat" class="active">Чат</button>
+          <button id="nav-prompts">Мои промпты</button>
+          <button id="nav-account">Личный кабинет</button>
+          <button id="nav-auth">Войти / Зарегистрироваться</button>
+        </nav>
+      </div>
+
+      <hr style="border:none;height:1px;background:rgba(255,255,255,0.02);margin:12px 0">
+
+      <div class="muted">Статус</div>
+      <div style="margin-top:10px" id="statusArea">
+        <div class="flex">
+          <span id="statusDot" class="success-dot" style="display:none"></span>
+          <div id="statusText" class="muted">Не авторизован</div>
+        </div>
+        <div style="margin-top:10px" id="userSmall" class="muted hidden"></div>
+      </div>
+
+      <footer>
+        Сделано для демонстрации · Тестируй локально
+      </footer>
+    </div>
+
+    <!-- CENTER: chat -->
+    <div class="panel card">
+      <div class="header">
+        <div>
+          <div style="font-weight:800" id="panelTitle">Чат</div>
+          <div class="small" id="panelSub">Поговори с нейронкой — сначала войди в аккаунт</div>
+        </div>
+        <div class="flex">
+          <button class="btn" id="btnRefreshPrompts" title="Обновить мои промпты">Обновить</button>
+        </div>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="center muted" id="welcomeMsg">
+          <div style="font-size:20px;font-weight:700;margin-bottom:8px">Привет! 👋</div>
+          <div class="muted">Войди в аккаунт и начни диалог — сообщения будут сохраняться в разделе «Мои промпты»</div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <textarea id="promptInput" placeholder="Напиши промпт..." aria-label="prompt"></textarea>
+        <button class="btn" id="sendBtn">Отправить</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: prompts & account -->
+    <div class="card" id="right">
+      <!-- prompts list -->
+      <div id="promptsView">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-weight:700">Мои промпты</div>
+          <div class="muted small">Здесь сохраняется история</div>
+        </div>
+        <div id="promptsList">
+          <div class="muted">Ничего не найдено — войди и отправь первый промпт</div>
+        </div>
+      </div>
+
+      <!-- account view -->
+      <div id="accountView" class="hidden">
+        <div style="font-weight:700;margin-bottom:8px">Личный кабинет</div>
+        <div id="accountInfo" class="muted small">Залогинься для просмотра информации</div>
+
+        <hr style="border:none;height:1px;background:rgba(255,255,255,0.02);margin:12px 0">
+
+        <div style="font-weight:700;margin-bottom:6px">Сменить имя</div>
+        <form id="formChangeName">
+          <input type="text" id="newName" placeholder="Новое имя" required />
+          <input type="password" id="namePassword" placeholder="Пароль" required />
+          <div class="flex">
+            <button class="btn" type="submit">Сменить имя</button>
+            <span id="changeNameResult" class="muted small"></span>
+          </div>
+        </form>
+
+        <hr style="border:none;height:1px;background:rgba(255,255,255,0.02);margin:12px 0">
+
+        <div style="font-weight:700;margin-bottom:6px">Сменить пароль</div>
+        <form id="formChangePassword">
+          <input type="password" id="oldPassword" placeholder="Старый пароль" required />
+          <input type="password" id="newPassword" placeholder="Новый пароль" required />
+          <input type="password" id="repeatNewPassword" placeholder="Повтор нового пароля" required />
+          <div class="flex">
+            <button class="btn" type="submit">Сменить пароль</button>
+            <span id="changePassResult" class="muted small"></span>
+          </div>
+        </form>
+
+        <hr style="border:none;height:1px;background:rgba(255,255,255,0.02);margin:12px 0">
+
+        <div style="font-weight:700;margin-bottom:6px">Удалить аккаунт</div>
+        <form id="formDeleteUser">
+          <input type="password" id="deletePassword" placeholder="Пароль для удаления" required />
+          <div class="flex">
+            <button class="btn danger" type="submit">Удалить аккаунт</button>
+            <span id="deleteResult" class="muted small"></span>
+          </div>
+        </form>
+      </div>
+
+      <!-- auth view -->
+      <div id="authView" class="hidden">
+        <div style="font-weight:700;margin-bottom:8px">Войти или зарегистрироваться</div>
+
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button id="showLogin" class="btn" style="flex:1">Войти</button>
+          <button id="showRegister" class="btn" style="flex:1">Регистрация</button>
+        </div>
+
+        <div id="loginPanel" class="">
+          <form id="formLogin">
+            <input type="email" id="loginEmail" placeholder="Email" required />
+            <input type="password" id="loginPassword" placeholder="Пароль" required />
+            <div class="flex">
+              <button class="btn" type="submit">Войти</button>
+              <span id="loginResult" class="muted small"></span>
+            </div>
+          </form>
+        </div>
+
+        <div id="registerPanel" class="hidden">
+          <form id="formRegister">
+            <input type="text" id="regName" placeholder="Имя" required />
+            <input type="email" id="regEmail" placeholder="Email" required />
+            <input type="password" id="regPassword" placeholder="Пароль" required />
+            <input type="password" id="regRepeatPassword" placeholder="Повторите пароль" required />
+            <div class="flex">
+              <button class="btn" type="submit">Зарегистрироваться</button>
+              <span id="regResult" class="muted small"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    /* ====== CONFIG ====== */
+    const API_BASE = ''; // если backend на том же хосте — оставить пустым. Иначе например 'http://localhost:8000'
+    // used endpoints (as in твоём коде)
+    const ENDPOINTS = {
+      sign_up: API_BASE + '/users/sign_up',
+      sign_in: API_BASE + '/users/sign_in',
+      get_info: API_BASE + '/users/get_info',
+      change_password: API_BASE + '/users/change_password',
+      change_name: API_BASE + '/users/change_name',
+      delete_user: API_BASE + '/users/delete_user',
+      send_prompt: API_BASE + '/send_prompt',
+      get_current_requests: API_BASE + '/get_current_requests'
+    };
+
+    /* ====== helpers ====== */
+    function el(id){ return document.getElementById(id) }
+    function show(elm){ elm.classList.remove('hidden') }
+    function hide(elm){ elm.classList.add('hidden') }
+    function setText(id, text){ el(id).textContent = text }
+
+    async function apiFetch(path, opts = {}) {
+      // default: send JSON and include cookies
+      const headers = opts.headers || {};
+      if (opts.json !== undefined) {
+        headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.json);
+        delete opts.json;
+      }
+      const res = await fetch(path, {
+        credentials: 'include',
+        ...opts,
+        headers
+      });
+      let data = null;
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) data = await res.json().catch(()=>null);
+      else data = await res.text().catch(()=>null);
+      if (!res.ok) {
+        // try to show useful error
+        const msg = (data && data.detail) ? data.detail : (data && data.message) ? data.message : (typeof data === 'string' ? data : 'Ошибка сети');
+        const err = new Error(msg || 'HTTP error');
+        err.status = res.status;
+        err.payload = data;
+        throw err;
+      }
+      return data;
+    }
+
+    /* ====== state ====== */
+    let state = {
+      user: null,
+      token: localStorage.getItem('token') || null
+    };
+
+    /* ====== UI wiring ====== */
+    const navChat = el('nav-chat'), navPrompts = el('nav-prompts'), navAccount = el('nav-account'), navAuth = el('nav-auth');
+    const panelTitle = el('panelTitle'), panelSub = el('panelSub');
+    const messages = el('messages'), promptInput = el('promptInput'), sendBtn = el('sendBtn');
+    const promptsList = el('promptsList'), promptsView = el('promptsView');
+    const accountView = el('accountView'), authView = el('authView');
+    const statusText = el('statusText'), statusDot = el('statusDot'), userSmall = el('userSmall');
+
+    function setActiveNav(btn){
+      [navChat, navPrompts, navAccount, navAuth].forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    navChat.onclick = () => {
+      setActiveNav(navChat);
+      el('panelTitle').textContent = 'Чат';
+      el('panelSub').textContent = 'Поговори с нейронкой — сначала войди в аккаунт';
+      hide(accountView); hide(authView);
+      show(promptsView);
+    };
+    navPrompts.onclick = async () => {
+      setActiveNav(navPrompts);
+      el('panelTitle').textContent = 'Мои промпты';
+      el('panelSub').textContent = 'История твоих запросов к нейронке';
+      hide(accountView); hide(authView);
+      show(promptsView);
+      await loadPrompts();
+    };
+    navAccount.onclick = async () => {
+      setActiveNav(navAccount);
+      el('panelTitle').textContent = 'Личный кабинет';
+      el('panelSub').textContent = 'Измени данные или удали аккаунт';
+      hide(promptsView); hide(authView);
+      show(accountView);
+      await loadAccountInfo();
+    };
+    navAuth.onclick = () => {
+      setActiveNav(navAuth);
+      el('panelTitle').textContent = 'Авторизация';
+      el('panelSub').textContent = 'Войдите или зарегистрируйтесь';
+      hide(promptsView); hide(accountView);
+      show(authView);
+    };
+
+    // auth toggles
+    el('showLogin').onclick = () => {
+      show(el('loginPanel')); hide(el('registerPanel'));
+    };
+    el('showRegister').onclick = () => {
+      show(el('registerPanel')); hide(el('loginPanel'));
+    };
+
+    /* ====== auth actions ====== */
+    el('formRegister').onsubmit = async (e) => {
+      e.preventDefault();
+      const name = el('regName').value.trim();
+      const email = el('regEmail').value.trim();
+      const password = el('regPassword').value;
+      const repeat_password = el('regRepeatPassword').value;
+      el('regResult').textContent = '...';
+      try {
+        const data = await apiFetch(ENDPOINTS.sign_up, { method: 'POST', json: { name, email, password, repeat_password } });
+        el('regResult').textContent = 'Зарегистрирован — можно войти';
+        el('regResult').className = 'muted small ok';
+        // auto-switch to login
+        show(el('loginPanel')); hide(el('registerPanel'));
+      } catch (err) {
+        el('regResult').textContent = err.message || 'Ошибка';
+        el('regResult').className = 'muted small error';
+      }
+    };
+
+    el('formLogin').onsubmit = async (e) => {
+      e.preventDefault();
+      const email = el('loginEmail').value.trim();
+      const password = el('loginPassword').value;
+      el('loginResult').textContent = '...';
+      try {
+        const data = await apiFetch(ENDPOINTS.sign_in, { method: 'POST', json: { email, password } });
+        // backend sets cookie via Set-Cookie if same-origin and credentials:include
+        // but backend also returns token in body — keep it for UI
+        if (data && data.token) {
+          localStorage.setItem('token', data.token);
+          state.token = data.token;
+        }
+        el('loginResult').textContent = 'Вход выполнен';
+        el('loginResult').className = 'muted small ok';
+        await loadAccountInfo();
+        updateAuthState(true);
+        // switch to chat
+        navChat.click();
+      } catch (err) {
+        el('loginResult').textContent = err.message || 'Ошибка';
+        el('loginResult').className = 'muted small error';
+      }
+    };
+
+    async function loadAccountInfo() {
+      try {
+        const data = await apiFetch(ENDPOINTS.get_info, { method: 'GET' });
+        if (data && data.info) {
+          state.user = data.info;
+          userSmall.textContent = `@${state.user.name} · ${state.user.email}`;
+          show(userSmall);
+          el('accountInfo').innerHTML = `<div><strong>${escapeHtml(state.user.name)}</strong></div><div class="muted small">${escapeHtml(state.user.email)}</div>`;
+          updateAuthState(true);
+        } else {
+          updateAuthState(false);
+        }
+      } catch (err) {
+        updateAuthState(false);
+      }
+    }
+
+    function updateAuthState(isLoggedIn) {
+      if (isLoggedIn) {
+        statusText.textContent = 'Авторизован';
+        show(statusDot);
+        state.isLoggedIn = true;
+      } else {
+        statusText.textContent = 'Не авторизован';
+        hide(statusDot);
+        state.isLoggedIn = false;
+        state.user = null;
+        localStorage.removeItem('token');
+        state.token = null;
+        hide(userSmall);
+      }
+    }
+
+    /* ====== chat ====== */
+    sendBtn.onclick = sendPrompt;
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPrompt(); }
+    });
+
+    async function sendPrompt() {
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+      // show user message
+      appendMessage(prompt, 'user');
+      promptInput.value = '';
+      // require login
+      if (!state.isLoggedIn) {
+        appendMessage('Нужно войти в аккаунт, чтобы отправить промпт.', 'bot');
+        return;
+      }
+      // send to backend
+      try {
+        appendMessage('Генерируется ответ... (пожалуйста, подожди)', 'bot', true);
+        const resp = await apiFetch(ENDPOINTS.send_prompt, { method: 'POST', json: { prompt } });
+        removeTempBot();
+        const answer = resp && resp.gemini ? resp.gemini : (resp && resp.answer) ? resp.answer : 'Нет ответа';
+        appendMessage(answer, 'bot');
+        // refresh prompts list
+        await loadPrompts();
+      } catch (err) {
+        removeTempBot();
+        appendMessage('Ошибка при отправке: ' + (err.message || 'ошибка'), 'bot');
+      }
+    }
+
+    function appendMessage(text, who = 'bot', isTemp = false) {
+      hide(el('welcomeMsg'));
+      const div = document.createElement('div');
+      div.className = 'message ' + (who === 'user' ? 'msg-user' : 'msg-bot');
+      if (isTemp) { div.dataset.temp = '1'; div.style.opacity = '0.75'; }
+      div.innerHTML = `<div style="white-space:pre-wrap">${escapeHtml(text)}</div><div class="small" style="margin-top:8px">${who==='user' ? 'Ты' : 'Нейросеть'}</div>`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    function removeTempBot(){
+      const temps = messages.querySelectorAll('[data-temp="1"]');
+      temps.forEach(n=>n.remove());
+    }
+
+    /* ====== prompts list ====== */
+    async function loadPrompts() {
+      try {
+        promptsList.innerHTML = '<div class="muted">Загрузка...</div>';
+        const data = await apiFetch(ENDPOINTS.get_current_requests, { method: 'GET' });
+        const arr = (data && data.your_prompts) ? data.your_prompts : [];
+        if (!arr.length) {
+          promptsList.innerHTML = '<div class="muted">История пуста — отправь промпт в чате</div>';
+          return;
+        }
+        promptsList.innerHTML = '';
+        // show newest first
+        arr.reverse().forEach(item => {
+          const elp = document.createElement('div'); elp.className = 'prompt-item';
+          const p_prompt = document.createElement('div'); p_prompt.innerHTML = `<strong>Промпт:</strong><pre>${escapeHtml(item.prompt||'')}</pre>`;
+          const p_answer = document.createElement('div'); p_answer.style.marginTop='8px';
+          p_answer.innerHTML = `<strong>Ответ:</strong><pre>${escapeHtml(item.answer||'')}</pre>`;
+          elp.appendChild(p_prompt); elp.appendChild(p_answer);
+          promptsList.appendChild(elp);
+        });
+      } catch (err) {
+        promptsList.innerHTML = `<div class="error">Не удалось загрузить промпты: ${escapeHtml(err.message||'Ошибка')}</div>`;
+      }
+    }
+    el('btnRefreshPrompts').onclick = loadPrompts;
+
+    /* ====== account actions ====== */
+    el('formChangeName').onsubmit = async (e) => {
+      e.preventDefault();
+      const new_name = el('newName').value.trim();
+      const password = el('namePassword').value;
+      el('changeNameResult').textContent = '...';
+      try {
+        const data = await apiFetch(ENDPOINTS.change_name, { method: 'PUT', json: { password, new_name } });
+        el('changeNameResult').textContent = 'Имя изменено';
+        el('changeNameResult').className = 'muted small ok';
+        await loadAccountInfo();
+      } catch (err) {
+        el('changeNameResult').textContent = err.message || 'Ошибка';
+        el('changeNameResult').className = 'muted small error';
+      }
+    };
+
+    el('formChangePassword').onsubmit = async (e) => {
+      e.preventDefault();
+      const old_password = el('oldPassword').value;
+      const new_password = el('newPassword').value;
+      const repeat_new_password = el('repeatNewPassword').value;
+      el('changePassResult').textContent = '...';
+      try {
+        const data = await apiFetch(ENDPOINTS.change_password, { method: 'PUT', json: { old_password, new_password, repeat_new_password } });
+        el('changePassResult').textContent = 'Пароль изменён';
+        el('changePassResult').className = 'muted small ok';
+      } catch (err) {
+        el('changePassResult').textContent = err.message || 'Ошибка';
+        el('changePassResult').className = 'muted small error';
+      }
+    };
+
+    el('formDeleteUser').onsubmit = async (e) => {
+      e.preventDefault();
+      if (!confirm('Ты уверен(а)? Удаление аккаунта — действие необратимое.')) return;
+      const password = el('deletePassword').value;
+      el('deleteResult').textContent = '...';
+      try {
+        const data = await apiFetch(ENDPOINTS.delete_user, { method: 'DELETE', json: { password } });
+        el('deleteResult').textContent = 'Аккаунт удалён';
+        el('deleteResult').className = 'muted small ok';
+        // log out locally
+        updateAuthState(false);
+        navAuth.click();
+      } catch (err) {
+        el('deleteResult').textContent = err.message || 'Ошибка';
+        el('deleteResult').className = 'muted small error';
+      }
+    };
+
+    /* ====== small utilities ====== */
+    function escapeHtml(unsafe) {
+      if (unsafe === null || unsafe === undefined) return '';
+      return String(unsafe)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    // init: try to get user info
+    (async function init() {
+      try {
+        await loadAccountInfo();
+        if (state.isLoggedIn) {
+          // pre-load prompts
+          await loadPrompts();
+        }
+      } catch (err) {
+        updateAuthState(false);
+      }
+    })();
+
+    // quick keyboard navigation
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'k') {
+        promptInput.focus();
+      }
+    });
+
+  </script>
+</body>
+</html>
